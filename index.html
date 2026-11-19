@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Graves Explorer</title>
+<style>
+ :root{--bg:#f5f6f4;--card:#fff;--ink:#1f2933;--muted:#6b7280;--accent:#2f6f5e;--line:#dde3df}
+ @media (prefers-color-scheme:dark){:root{--bg:#151a18;--card:#1e2522;--ink:#e6ece9;--muted:#9aa5a0;--line:#2e3833}}
+ body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--ink);font:15px -apple-system,"PingFang SC",Arial,sans-serif}
+ form{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:28px;width:min(340px,calc(100vw - 32px));box-sizing:border-box}
+ h1{font-size:18px;margin:0 0 4px} p{color:var(--muted);margin:0 0 16px;font-size:13px}
+ input{width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--line);border-radius:6px;font-size:15px;background:var(--bg);color:var(--ink)}
+ button{margin-top:12px;width:100%;padding:10px;border:0;border-radius:6px;background:var(--accent);color:#fff;font-size:15px;cursor:pointer}
+ #msg{min-height:18px;margin-top:10px;font-size:13px;color:#b91c1c}
+</style></head><body>
+<form id="f"><h1>Lower Yangzi Graves Explorer</h1><p>长江下游史前墓葬数据浏览器 · 请输入密码 / enter the password</p>
+<input type="password" id="pw" autocomplete="current-password" autofocus placeholder="Password / 密码">
+<button id="go">Open / 打开</button><div id="msg"></div></form>
+<script>
+const ITER=600000;
+async function openSite(pw){
+  const msg=document.getElementById("msg"); msg.style.color="var(--muted)"; msg.textContent="Decrypting… / 解密中…";
+  const buf=new Uint8Array(await (await fetch("data.bin",{cache:"no-cache"})).arrayBuffer());
+  const salt=buf.slice(0,16), iv=buf.slice(16,28), data=buf.slice(28);
+  const base=await crypto.subtle.importKey("raw",new TextEncoder().encode(pw),"PBKDF2",false,["deriveKey"]);
+  const key=await crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:ITER,hash:"SHA-256"},base,{name:"AES-GCM",length:256},false,["decrypt"]);
+  let plain;
+  try{ plain=await crypto.subtle.decrypt({name:"AES-GCM",iv},key,data); }
+  catch(e){ msg.style.color="#b91c1c"; msg.textContent="Wrong password / 密码错误"; try{sessionStorage.removeItem("lzpw")}catch(_){} return; }
+  try{sessionStorage.setItem("lzpw",pw)}catch(_){}
+  const html=new TextDecoder().decode(plain);
+  document.open(); document.write(html); document.close();
+}
+document.getElementById("f").onsubmit=e=>{e.preventDefault(); openSite(document.getElementById("pw").value);};
+try{ const s=sessionStorage.getItem("lzpw"); if(s) openSite(s); }catch(_){}
+</script></body></html>
